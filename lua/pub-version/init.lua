@@ -76,6 +76,47 @@ local function apply_update(bufnr, dep)
   return true
 end
 
+--- Re-parse the buffer and re-render extmarks from cached results (no network).
+--- Used after update/update_all to realign annotations without spawning curl.
+---@param bufnr number
+local function redisplay(bufnr)
+  local old_results = _results[bufnr]
+  if not old_results then return end
+
+  -- Index old results by package name for lookup
+  local by_name = {}
+  for _, dep in pairs(old_results) do
+    by_name[dep.name] = dep
+  end
+
+  display.clear(bufnr)
+
+  local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+  local deps = parser.parse_dependencies(lines)
+
+  -- Rebuild _results with updated line numbers
+  local new_results = {}
+  for _, dep in ipairs(deps) do
+    local cached = by_name[dep.name]
+    if cached then
+      -- Update line number and current version to reflect buffer changes
+      local entry = vim.tbl_extend("force", cached, {
+        line = dep.line,
+        current = dep.version,
+        upgrade = version_util.upgrade_type(dep.version, cached.latest),
+      })
+      new_results[dep.line] = entry
+
+      display.set_result(bufnr, dep.line, dep.version, cached.latest, {
+        is_discontinued = cached.is_discontinued,
+        replacement = cached.replacement,
+      })
+    end
+  end
+
+  _results[bufnr] = new_results
+end
+
 --- Run the version check on a buffer.
 ---@param bufnr? number
 function M.check(bufnr)
@@ -182,10 +223,11 @@ function M.update(bufnr)
     return
   end
 
+  display.clear(bufnr)
   if apply_update(bufnr, dep) then
     vim.notify("pub-version: Updated " .. dep.name .. " to " .. dep.latest, vim.log.levels.INFO)
-    M.check(bufnr) -- re-check to realign all annotations
   end
+  redisplay(bufnr)
 end
 
 --- Update all outdated dependencies.
@@ -213,6 +255,9 @@ function M.update_all(bufnr)
 
   table.sort(outdated, function(a, b) return a.line > b.line end)
 
+  -- Clear all extmarks BEFORE modifying lines to prevent drift
+  display.clear(bufnr)
+
   local count = 0
   for _, dep in ipairs(outdated) do
     if apply_update(bufnr, dep) then
@@ -225,11 +270,8 @@ function M.update_all(bufnr)
     vim.log.levels.INFO
   )
 
-  -- Re-check to re-parse the modified buffer and realign all annotations.
-  -- Versions are cached so this is instant.
-  if count > 0 then
-    M.check(bufnr)
-  end
+  -- Re-parse and redisplay annotations from cached results (no network calls).
+  redisplay(bufnr)
 end
 
 --- Open the pub.dev page for the dependency under cursor.
