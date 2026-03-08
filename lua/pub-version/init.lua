@@ -63,7 +63,7 @@ local function get_dep_at_cursor(bufnr)
   return buf_results[line]
 end
 
---- Apply a version update to a single dependency line.
+--- Apply a version update to a single dependency line (buffer text only).
 ---@param bufnr number
 ---@param dep table
 ---@return boolean true if the line was changed
@@ -73,8 +73,6 @@ local function apply_update(bufnr, dep)
   local new_line = line_content:gsub(vim.pesc(dep.current), dep.latest, 1)
   if new_line == line_content then return false end
   vim.api.nvim_buf_set_lines(bufnr, dep.line, dep.line + 1, false, { new_line })
-  dep.current = dep.latest
-  display.set_result(bufnr, dep.line, dep.current, dep.latest)
   return true
 end
 
@@ -186,6 +184,7 @@ function M.update(bufnr)
 
   if apply_update(bufnr, dep) then
     vim.notify("pub-version: Updated " .. dep.name .. " to " .. dep.latest, vim.log.levels.INFO)
+    M.check(bufnr) -- re-check to realign all annotations
   end
 end
 
@@ -225,6 +224,12 @@ function M.update_all(bufnr)
     string.format("pub-version: Updated %d/%d dependencies", count, #outdated),
     vim.log.levels.INFO
   )
+
+  -- Re-check to re-parse the modified buffer and realign all annotations.
+  -- Versions are cached so this is instant.
+  if count > 0 then
+    M.check(bufnr)
+  end
 end
 
 --- Open the pub.dev page for the dependency under cursor.
