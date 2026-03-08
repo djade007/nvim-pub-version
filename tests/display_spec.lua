@@ -80,14 +80,10 @@ describe("display", function()
   end)
 
   describe("set_result", function()
-    it("shows up-to-date for equal versions", function()
+    it("shows no annotation for up-to-date versions", function()
       display.set_result(bufnr, 1, "6.0.5", "6.0.5")
       local marks = get_extmarks(bufnr)
-      assert.are.equal(1, #marks)
-      local text = marks[1][4].virt_text[1][1]
-      local hl = marks[1][4].virt_text[1][2]
-      assert.is_truthy(text:find("6.0.5"))
-      assert.are.equal("PubVersionUpToDate", hl)
+      assert.are.equal(0, #marks)
     end)
 
     it("shows major update", function()

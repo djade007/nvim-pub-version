@@ -69,6 +69,7 @@ function M.set_result(bufnr, line, current, latest, opts)
   local text, hl
 
   if upgrade == "up_to_date" then
+    vim.api.nvim_buf_clear_namespace(bufnr, ns, line, line + 1)
     return
   elseif upgrade == "major" then
     text = config.icons.major .. " " .. latest .. " (major)"
