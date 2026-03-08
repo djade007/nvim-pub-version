@@ -69,8 +69,7 @@ function M.set_result(bufnr, line, current, latest, opts)
   local text, hl
 
   if upgrade == "up_to_date" then
-    text = config.icons.up_to_date .. " " .. latest
-    hl = "PubVersionUpToDate"
+    return
   elseif upgrade == "major" then
     text = config.icons.major .. " " .. latest .. " (major)"
     hl = "PubVersionMajor"
